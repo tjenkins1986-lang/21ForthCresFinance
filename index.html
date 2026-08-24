@@ -1223,6 +1223,7 @@
 
     <div class="tile">
       <ul class="actions-list" id="rollingActionsList"></ul>
+      <span id="actionsSyncStatus" class="json-import-status" style="display:block; margin-top:10px;"></span>
     </div>
   </section>
 
@@ -2034,12 +2035,32 @@ function renderRollingActions(){
   }).join('') || `<li style="color:var(--text-low); font-size:13px;">No actions yet.</li>`;
 
   listEl.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-    cb.addEventListener('change', (e) => {
+    cb.addEventListener('change', async (e) => {
       const idx = Number(e.target.dataset.idx);
       STATE.actions[idx].done = e.target.checked;
       renderRollingActions();
+      await persistActionsChange();
     });
   });
+}
+
+async function persistActionsChange(){
+  const statusEl = document.getElementById('actionsSyncStatus');
+  if(typeof window.__saveStateToCloud !== 'function'){
+    statusEl.textContent = 'Kept in this browser only — cloud storage isn\'t connected yet.';
+    statusEl.className = 'json-import-status';
+    return;
+  }
+  statusEl.textContent = 'Saving…';
+  statusEl.className = 'json-import-status';
+  try {
+    await window.__saveStateToCloud(STATE);
+    statusEl.textContent = 'Saved — visible to both of you now.';
+    statusEl.className = 'json-import-status success';
+  } catch(e){
+    statusEl.textContent = 'Save failed: ' + e.message;
+    statusEl.className = 'json-import-status error';
+  }
 }
 
 /* =========================================================================
