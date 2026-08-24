@@ -2076,9 +2076,58 @@ function deriveAndRenderAll(){
    ========================================================================= */
 const STATE_KEYS = ['household','principles','netWorth','moneyApproaches','spend','contrib','savingsGoals','nextMonthConfig','story','actions','meta'];
 
+// spend and contrib are month-by-month histories, not point-in-time snapshots — merging
+// (rather than replacing) lets a monthly update JSON contain just the new month instead
+// of the whole history every time. Everything else in STATE_KEYS is a current-state
+// snapshot (net worth, goals, etc.) where a full replace is the right behaviour.
+function mergeMonthsArray(existing, incoming){
+  const set = new Set(existing || []);
+  (incoming || []).forEach(m => set.add(m));
+  return Array.from(set).sort(); // "YYYY-MM" strings sort chronologically as-is
+}
+
+function mergeSpend(target, incoming){
+  if(incoming.months) target.months = mergeMonthsArray(target.months, incoming.months);
+  if(incoming.categories){
+    const set = new Set(target.categories || []);
+    incoming.categories.forEach(c => set.add(c));
+    target.categories = Array.from(set);
+  }
+  if(incoming.monthly){
+    Object.keys(incoming.monthly).forEach(cat => {
+      target.monthly[cat] = target.monthly[cat] || {};
+      Object.assign(target.monthly[cat], incoming.monthly[cat]);
+    });
+  }
+  if(incoming.transactions){
+    Object.keys(incoming.transactions).forEach(cat => {
+      target.transactions[cat] = target.transactions[cat] || {};
+      Object.assign(target.transactions[cat], incoming.transactions[cat]);
+    });
+  }
+}
+
+function mergeContrib(target, incoming){
+  if(incoming.months) target.months = mergeMonthsArray(target.months, incoming.months);
+  if(incoming.excludeMonths) target.excludeMonths = incoming.excludeMonths;
+  if(incoming.rows){
+    Object.keys(incoming.rows).forEach(row => {
+      target.rows[row] = target.rows[row] || { monthly: {}, transactions: {} };
+      if(incoming.rows[row].monthly) Object.assign(target.rows[row].monthly, incoming.rows[row].monthly);
+      if(incoming.rows[row].transactions) Object.assign(target.rows[row].transactions, incoming.rows[row].transactions);
+    });
+  }
+}
+
 function applyJsonToState(data){
   const applied = [];
-  STATE_KEYS.forEach(k => { if(data[k] !== undefined){ STATE[k] = data[k]; applied.push(k); } });
+  STATE_KEYS.forEach(k => {
+    if(data[k] === undefined) return;
+    if(k === 'spend') mergeSpend(STATE.spend, data.spend);
+    else if(k === 'contrib') mergeContrib(STATE.contrib, data.contrib);
+    else STATE[k] = data[k];
+    applied.push(k);
+  });
   return applied;
 }
 

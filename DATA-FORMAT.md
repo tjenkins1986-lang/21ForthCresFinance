@@ -10,22 +10,28 @@ statement) so its output loads cleanly.
 - Paste JSON into the Widget 09 box, click **Apply Locally** to preview
   in your browser only, then **Save to Cloud** to make it live for both
   of you.
-- **Partial updates are fine.** The JSON only needs to contain the
-  top-level keys you're actually changing. Any key you omit is left
-  exactly as it was. So a typical monthly update usually only needs
-  `netWorth`, `spend`, `contrib`, `story`, `actions`, and `meta` —
-  `household`, `principles`, `savingsGoals` and `nextMonthConfig` rarely
-  change month to month.
+- **Partial updates are fine, and work two different ways depending on
+  the key:**
+  - `spend` and `contrib` are **merged**, not replaced. Include only the
+    new month's data and it's added alongside everything already there —
+    existing months, categories, and rows you don't mention are left
+    untouched. You never need to resend the full history.
+  - Every other key (`household`, `principles`, `netWorth`,
+    `moneyApproaches`, `savingsGoals`, `nextMonthConfig`, `story`,
+    `actions`, `meta`) is a **full replace** if included at all — it
+    represents current state, not a history, so send the complete
+    current value of that key, not a delta. A typical monthly update
+    only needs to include `netWorth`, `spend`, `contrib`, `story`,
+    `actions`, and `meta`; the rest change rarely enough to just omit.
+  - Any key you omit entirely is left exactly as it was.
 - Every number is a plain JSON number — no `£` signs, no commas
   (`1234.56`, not `"£1,234.56"`).
 - Every month is `"YYYY-MM"` (e.g. `"2026-09"`). Every date is
   `"YYYY-MM-DD"` (e.g. `"2026-09-03"`).
-- Months arrays must be in chronological order, oldest first. The **last**
-  entry in `spend.months` is treated as "the current month" throughout
-  the app (drives the 6-month rolling average window, the forecast
-  target month, etc.) — so when a new month closes, append it to the end
-  of `spend.months` (and `contrib.months`) rather than replacing the
-  array.
+- The **latest** month present in `spend.months` after merging is treated
+  as "the current month" throughout the app (drives the 6-month rolling
+  average window, the forecast target month, etc.), so just include the
+  new month you want to add — no need to reorder or resend past ones.
 
 ## Top-level keys
 
@@ -95,6 +101,39 @@ Including this key **replaces the whole list**, so only include it if
 you mean to overwrite what's currently there.
 
 ### `spend`
+**Merged, not replaced** — a monthly update only needs the new month:
+```json
+{
+  "spend": {
+    "months": ["2026-09"],
+    "monthly": {
+      "Groceries": { "2026-09": 812.40 },
+      "Mortgage/Loan": { "2026-09": 1308.57 }
+    },
+    "transactions": {
+      "Groceries": {
+        "2026-09": [
+          { "date": "2026-09-06", "desc": "CARD PAYMENT TO TESCO STORES", "amount": 12.89 }
+        ]
+      },
+      "Mortgage/Loan": {
+        "2026-09": [
+          { "date": "2026-09-02", "desc": "DIRECT DEBIT PAYMENT TO NATWEST BANK", "amount": 1308.57 }
+        ]
+      }
+    }
+  }
+}
+```
+Only mention the categories that actually had spend that month — any
+category you don't include is left exactly as it was. If you need to
+correct a past month (e.g. a miscategorised transaction from July),
+include that month's key again under the relevant category — it
+overwrites just that category/month combination, nothing else.
+
+The full shape, for reference (this is what **Copy Current Data as
+JSON** will show you, and what a from-scratch `spend` object looks
+like):
 ```json
 {
   "months": ["2026-01", "2026-02", "...", "2026-09"],
@@ -136,26 +175,34 @@ match, the totals shown won't match what the modal shows when you click
 into them.
 
 ### `contrib`
+**Merged, not replaced**, the same way as `spend` — a monthly update only
+needs the new month:
 ```json
 {
-  "months": ["2026-01", "...", "2026-09"],
-  "rows": {
-    "Tom — Regular": {
-      "monthly": { "2026-09": 3198 },
-      "transactions": { "2026-09": [ { "date": "2026-08-31", "amount": 3198, "desc": "..." } ] }
-    },
-    "Hannah — Regular": { "monthly": { "2026-09": 2480 }, "transactions": { "2026-09": [] } },
-    "Top Ups — Tom": { "monthly": { "2026-09": 0 }, "transactions": { "2026-09": [] } },
-    "Top Ups — Hannah": { "monthly": { "2026-09": 0 }, "transactions": { "2026-09": [] } },
-    "Savings Drawdowns": { "monthly": { "2026-09": 0 }, "transactions": { "2026-09": [] } }
-  },
-  "excludeMonths": []
+  "contrib": {
+    "months": ["2026-09"],
+    "rows": {
+      "Tom — Regular": {
+        "monthly": { "2026-09": 3198 },
+        "transactions": { "2026-09": [ { "date": "2026-08-31", "amount": 3198, "desc": "..." } ] }
+      },
+      "Hannah — Regular": { "monthly": { "2026-09": 2480 }, "transactions": { "2026-09": [] } }
+    }
+  }
 }
 ```
+Only include rows that actually had activity that month — rows you
+don't mention (and past months within a row you don't mention) are left
+untouched. `excludeMonths`, if included, is a small full-replace list
+(not merged) — just resend the complete current exclude list if it
+needs to change.
+
 Unlike `spend.categories`, **row names here are not fixed** — Widget 05
 just renders whatever keys exist in `rows`, in the order they appear. The
-five shown above are just the convention used so far; keep using them
-for consistency unless you deliberately want to restructure this widget.
+five you'll see in **Copy Current Data as JSON** (`Tom — Regular`,
+`Hannah — Regular`, `Top Ups — Tom`, `Top Ups — Hannah`, `Savings
+Drawdowns`) are just the convention used so far; keep using them for
+consistency unless you deliberately want to restructure this widget.
 
 ### `savingsGoals`
 ```json
@@ -226,13 +273,18 @@ month is fully closed, use the month's last day number.
 
 ## A safe monthly workflow
 
-1. In the app, click **Copy Current Data as JSON** (Widget 09) to get
-   the current full state — this is your starting point, so nothing gets
-   silently dropped.
-2. Hand that, plus your new month's bank statement, to whatever process
-   builds the update (e.g. a Claude conversation) with instructions to
-   return a JSON object containing only the keys that changed, following
-   this document.
-3. Paste the result into Widget 09, click **Apply Locally**, and eyeball
-   the numbers before trusting them.
-4. Click **Save to Cloud** once it looks right.
+1. Hand your new month's bank statement to whatever process builds the
+   update (e.g. a Claude conversation), along with this document, and
+   ask for a JSON object containing just the new month's `spend` and
+   `contrib` data, plus a refreshed `netWorth`, `story`, `actions`, and
+   `meta` (those five are the only keys that typically change month to
+   month). You do **not** need to extract or resend the existing
+   history — `spend` and `contrib` merge in automatically.
+2. Paste the result into Widget 09, click **Apply Locally**, and eyeball
+   the numbers before trusting them — the app recalculates everything
+   live, so a wrong figure will usually stand out.
+3. Click **Save to Cloud** once it looks right.
+4. If you ever want to sanity-check exactly what's currently stored
+   (e.g. to hand to a different tool, or just to look something up),
+   **Copy Current Data as JSON** in Widget 09 gives you the full current
+   state, history included.
