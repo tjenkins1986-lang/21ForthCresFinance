@@ -105,7 +105,7 @@ these top-level keys — only the keys you include get replaced, everything
 else is left as-is:
 
 ```
-household, principles, netWorth, submissions, spend, contrib,
+household, principles, netWorth, moneyApproaches, spend, contrib,
 savingsGoals, nextMonthConfig, story, actions, meta
 ```
 

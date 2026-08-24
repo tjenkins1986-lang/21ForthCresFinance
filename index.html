@@ -615,53 +615,70 @@
     margin-top: 6px;
   }
 
-  /* ---------- Monthly submissions table ---------- */
-  table.submissions-table{
-    border-collapse: collapse;
+  /* ---------- Agreed approaches to money ---------- */
+  .approach-add{ margin-bottom: 4px; }
+  textarea.approach-input{
     width: 100%;
-    min-width: 560px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 12.5px;
-  }
-  .submissions-table thead th{
-    text-align: right;
-    font-size: 10px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-low);
-    padding: 0 10px 10px;
-    border-bottom: 1px solid var(--line-strong);
-    white-space: nowrap;
-  }
-  .submissions-table thead th.col-month{ text-align: left; }
-  .submissions-table tbody td, .submissions-table tfoot td{
-    padding: 8px 10px;
-    text-align: right;
-    border-bottom: 1px dashed var(--line);
-    white-space: nowrap;
-  }
-  .submissions-table td.col-month{
-    text-align: left;
+    min-height: 56px;
+    background: var(--ink);
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+    color: var(--text-mid);
     font-family: 'IBM Plex Sans', sans-serif;
     font-size: 13px;
+    line-height: 1.5;
+    padding: 10px 12px;
+    resize: vertical;
+    box-sizing: border-box;
+  }
+  textarea.approach-input::placeholder{ color: var(--text-low); }
+  textarea.approach-input:focus{ outline: none; border-color: var(--brass-dim); }
+  .approach-add-row{
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+  }
+  .approaches-list{
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .approach-item{
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 12px 0;
+    border-top: 1px dashed var(--line);
+  }
+  .approach-item:first-child{ border-top: none; }
+  .approach-text{
+    font-size: 13px;
     color: var(--text-mid);
+    line-height: 1.6;
+    flex: 1;
+    min-width: 0;
+    white-space: pre-wrap;
   }
-  .submissions-table td.col-tom{ color: var(--sage); }
-  .submissions-table td.col-hannah{ color: var(--brass); }
-  .submissions-table td.col-split{
-    font-size: 11px;
+  .approach-meta{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
     color: var(--text-low);
+    margin-top: 4px;
   }
-  .submissions-table tfoot td{
-    border-bottom: none;
-    border-top: 1px solid var(--line-strong);
-    font-weight: 500;
-    color: var(--text-hi);
+  .approach-remove{
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--text-low);
+    font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 2px 0;
   }
-  .submissions-table tfoot td.col-month{
-    font-family: 'Fraunces', serif;
-    font-size: 14px;
-  }
+  .approach-remove:hover{ color: var(--clay); }
 
   /* ---------- Widget 05: forecast table ---------- */
   table.forecast-table{
@@ -1016,16 +1033,17 @@
 
     <div class="tile">
       <div class="tile-head">
-        <div class="tile-label">Monthly Submissions — Gross, As Paid In</div>
-        <div class="tile-note">No netting or reimbursements applied — this is what each of you actually paid into the joint account each month.</div>
+        <div class="tile-label">Agreed Approaches to Money</div>
+        <div class="tile-note">Anything you've agreed beyond the three principles above — write it down here so it's visible to both of you.</div>
       </div>
-      <div class="table-scroll">
-        <table class="submissions-table" id="submissionsTable">
-          <thead id="submissionsThead"></thead>
-          <tbody id="submissionsTbody"></tbody>
-          <tfoot id="submissionsTfoot"></tfoot>
-        </table>
+      <div class="approach-add">
+        <textarea id="approachInput" class="approach-input" rows="2" placeholder="e.g. We'll each keep back £50/month for personal spending before the joint split..."></textarea>
+        <div class="approach-add-row">
+          <button type="button" id="approachAddBtn" class="json-import-btn">Add</button>
+          <span id="approachStatus" class="json-import-status"></span>
+        </div>
       </div>
+      <ul class="approaches-list" id="approachesList"></ul>
     </div>
   </section>
 
@@ -1225,7 +1243,7 @@
   "household": { "contributorAName": "Person A", "contributorBName": "Person B" },
   "principles": [...],
   "netWorth": { "asOf": "2026-09-24", "assets": [...], "property": {...}, "pensions": {...} },
-  "submissions": { "months": [...], "submissions": {...}, "excludeMonths": [...] },
+  "moneyApproaches": [ { "text": "...", "addedDate": "2026-09-24" } ],
   "spend": { "months": [...], "categories": [...], "monthly": {...}, "transactions": {...} },
   "contrib": { "months": [...], "rows": {...}, "excludeMonths": [...] },
   "savingsGoals": [...],
@@ -1299,7 +1317,7 @@ let STATE = {
       personB: { name: '', pots: [] }
     }
   },
-  submissions: { months: [], submissions: {}, excludeMonths: [] },
+  moneyApproaches: [],
   spend: { months: [], categories: [], monthly: {}, transactions: {} },
   contrib: { months: [], rows: {}, excludeMonths: [] },
   savingsGoals: [],
@@ -1498,7 +1516,7 @@ function renderAll(){
 }
 
 /* =========================================================================
-   WIDGET 01: Principles & submissions
+   WIDGET 01: Principles & agreed approaches to money
    ========================================================================= */
 function renderPrinciples(){
   const el = document.getElementById('principlesGrid');
@@ -1518,54 +1536,59 @@ function renderPrinciples(){
   }).join('');
 }
 
-function renderSubmissions(){
-  const excludeMonths = STATE.submissions.excludeMonths || [];
-  const months = (STATE.submissions.months || []).filter(m => !excludeMonths.includes(m));
-  const subs = STATE.submissions.submissions || {};
-  const a = STATE.household.contributorAName, b = STATE.household.contributorBName;
+function renderApproaches(){
+  const list = STATE.moneyApproaches || [];
+  const el = document.getElementById('approachesList');
+  el.innerHTML = list.length === 0
+    ? `<li style="color:var(--text-low); font-size:13px; padding:12px 0;">Nothing added yet.</li>`
+    : list.map((item, i) => `
+      <li class="approach-item">
+        <div>
+          <div class="approach-text">${escapeHtml(item.text)}</div>
+          ${item.addedDate ? `<div class="approach-meta">Added ${formatDate(item.addedDate)}</div>` : ''}
+        </div>
+        <button type="button" class="approach-remove" data-idx="${i}">Remove</button>
+      </li>`).join('');
 
-  const noteEl = document.querySelector('#widget-principles .tile:nth-of-type(2) .tile-note');
-  if(noteEl && excludeMonths.length){
-    noteEl.innerHTML = `No netting or reimbursements applied — this is what each of you actually paid into the joint account each month. ` +
-      `<span style="color:var(--text-mid)">${excludeMonths.map(monthShort).join(', ')} excluded from this view.</span>`;
-  }
-
-  document.getElementById('submissionsThead').innerHTML = `<tr>
-    <th class="col-month">Month</th>
-    <th>${a}</th>
-    <th>${b}</th>
-    <th>Total</th>
-    <th>Split</th>
-  </tr>`;
-
-  let totalA = 0, totalB = 0;
-  document.getElementById('submissionsTbody').innerHTML = months.map(m => {
-    const entry = subs[m] || { thomas: 0, hannah: 0 };
-    const va = Number(entry.thomas || 0), vb = Number(entry.hannah || 0);
-    totalA += va; totalB += vb;
-    const total = va + vb;
-    const splitA = total !== 0 ? (va/total*100).toFixed(0) : '–';
-    const splitB = total !== 0 ? (vb/total*100).toFixed(0) : '–';
-    return `<tr>
-      <td class="col-month">${monthLong(m)}</td>
-      <td class="col-tom">${gbp(va)}</td>
-      <td class="col-hannah">${gbp(vb)}</td>
-      <td>${gbp(total)}</td>
-      <td class="col-split">${total!==0 ? splitA+'% / '+splitB+'%' : '–'}</td>
-    </tr>`;
-  }).join('');
-
-  const grandTotal = totalA + totalB;
-  const ytdSplitA = grandTotal !== 0 ? (totalA/grandTotal*100).toFixed(1) : '–';
-  const ytdSplitB = grandTotal !== 0 ? (totalB/grandTotal*100).toFixed(1) : '–';
-  document.getElementById('submissionsTfoot').innerHTML = `<tr>
-    <td class="col-month">YTD Total</td>
-    <td class="col-tom">${gbp(totalA)}</td>
-    <td class="col-hannah">${gbp(totalB)}</td>
-    <td>${gbp(grandTotal)}</td>
-    <td class="col-split">${ytdSplitA}% / ${ytdSplitB}%</td>
-  </tr>`;
+  el.querySelectorAll('.approach-remove').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      STATE.moneyApproaches.splice(Number(btn.dataset.idx), 1);
+      renderApproaches();
+      await persistApproaches();
+    });
+  });
 }
+
+async function persistApproaches(){
+  const statusEl = document.getElementById('approachStatus');
+  if(typeof window.__saveStateToCloud !== 'function'){
+    statusEl.textContent = 'Kept in this browser only — cloud storage isn\'t connected yet.';
+    statusEl.className = 'json-import-status';
+    return;
+  }
+  statusEl.textContent = 'Saving…';
+  statusEl.className = 'json-import-status';
+  try {
+    await window.__saveStateToCloud(STATE);
+    statusEl.textContent = 'Saved — visible to both of you now.';
+    statusEl.className = 'json-import-status success';
+  } catch(e){
+    statusEl.textContent = 'Save failed: ' + e.message;
+    statusEl.className = 'json-import-status error';
+  }
+}
+
+async function addApproach(){
+  const input = document.getElementById('approachInput');
+  const text = input.value.trim();
+  if(!text) return;
+  STATE.moneyApproaches.push({ text, addedDate: new Date().toISOString().slice(0,10) });
+  input.value = '';
+  renderApproaches();
+  await persistApproaches();
+}
+
+document.getElementById('approachAddBtn').addEventListener('click', addApproach);
 
 /* =========================================================================
    WIDGET 04: Where We Spend
@@ -2037,7 +2060,7 @@ function deriveAndRenderAll(){
   CONTRIB_TRAILING_MONTHS = CONTRIB_MONTHS.slice(0, Math.max(0, CONTRIB_MONTHS.length-1));
 
   renderPrinciples();
-  renderSubmissions();
+  renderApproaches();
   renderAll();
   renderSpendTable();
   renderContribTable();
@@ -2051,7 +2074,7 @@ function deriveAndRenderAll(){
    WIDGET 09: Monthly data update — apply locally, save to cloud, or copy
    the current state back out as JSON.
    ========================================================================= */
-const STATE_KEYS = ['household','principles','netWorth','submissions','spend','contrib','savingsGoals','nextMonthConfig','story','actions','meta'];
+const STATE_KEYS = ['household','principles','netWorth','moneyApproaches','spend','contrib','savingsGoals','nextMonthConfig','story','actions','meta'];
 
 function applyJsonToState(data){
   const applied = [];
