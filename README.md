@@ -74,9 +74,10 @@ message instead of a confusing permission error if the wrong account
 signs in. This part is cosmetic; the Firestore rules are what matters.
 
 ### 7. Enable GitHub Pages
-In this repo on GitHub: **Settings** > **Pages** > under **Build and
-deployment**, set **Source** to "Deploy from a branch", branch `main`,
-folder `/ (root)`, then **Save**. Your site will be live shortly after at:
+This repo has a GitHub Actions workflow (`.github/workflows/deploy-pages.yml`)
+that deploys on every push to `main`. In this repo on GitHub: **Settings**
+> **Pages** > under **Build and deployment**, set **Source** to
+**"GitHub Actions"**. Your site will be live shortly after at:
 
 ```
 https://<your-github-username>.github.io/21ForthCresFinance/
