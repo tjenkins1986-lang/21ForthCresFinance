@@ -5,6 +5,65 @@ This is the exact shape the app expects when you paste a snapshot into
 generates your monthly JSON (e.g. a Claude conversation fed your bank
 statement) so its output loads cleanly.
 
+## Run this as a conversation, not a conversion job
+
+A bank statement only tells you about money that moved through the
+current account — it says nothing about pension values, savings account
+balances that had no activity, or whether a savings goal's target has
+changed. Do not treat "process the statement" as the whole task. Work
+through the checklist below **widget by widget, in order, asking a
+direct question for anything the statement can't answer** — the point is
+to surface what needs updating, not to silently omit it because it wasn't
+handed to you unprompted.
+
+Start every monthly session by asking for **Copy Current Data as JSON**
+from Widget 09 (the current full state) — you need it as a baseline
+before you can produce a sensible merge/replace update, and so you're not
+guessing at what's already on record (existing savings goal targets,
+open rolling actions, current account labels, etc.).
+
+1. **Net Worth (Widget 02)** — the one most likely to get silently
+   skipped, so ask explicitly, one line at a time, don't assume "no
+   change" without asking:
+   - Current balance for **every** asset already listed (by name) — the
+     statement won't show savings/investment accounts that had no
+     transactions this month, so ask for each one directly.
+   - **Pension value(s)** — always ask, for both people if joint. This
+     needs a separate source (provider portal or statement), never
+     inferred from the current account.
+   - Mortgage balance — usually only changes with a mortgage statement,
+     not the current account; ask if one's arrived.
+   - Property value estimate — ask if they have a reason to update it
+     (rare; skip asking every month if they've said it's annual-only).
+2. **Story of the Month (Widget 03)** — ask reflective questions rather
+   than inventing a narrative from numbers alone: *"What stood out this
+   month? Any one-off costs, wins, or overspend worth explaining?"* Draft
+   the paragraphs from their answer, then show it back for approval.
+3. **Where We Spend (Widget 04)** — this part genuinely does come from
+   the statement. Categorise transactions per the fixed category list
+   below; ask about anything ambiguous rather than guessing.
+4. **What We Contribute (Widget 05, joint version only)** — ask each
+   person's regular contribution and any top-ups/drawdowns for the
+   month, same as spend: don't infer from the joint account alone if a
+   personal top-up came from elsewhere.
+5. **Savings Goals (Widget 06)** — always ask: *"Any change to a savings
+   goal — new target amount, new target date, or a new goal to add?"*
+   Current balances come from Net Worth automatically (goals link to an
+   asset by name), so this question is specifically about the target/date,
+   not the balance.
+6. **Next Month's Forecast (Widget 07)** — fully computed by the app from
+   the above. Nothing to ask here.
+7. **Rolling Actions (Widget 08)** — ask: *"Any open action now
+   resolved? Anything new to raise from this month's review?"* Since this
+   key fully replaces on include, carry forward the existing list (from
+   the "Copy Current Data as JSON" baseline) with edits applied, don't
+   drop items that weren't mentioned.
+8. **`meta.currentAsOfDay`** — ask what day the statement data runs to,
+   or whether the month is fully closed.
+
+Only after working through all of the above should you assemble and
+output the final JSON, following the schema below.
+
 ## How loading works
 
 - Paste JSON into the Widget 09 box, click **Apply Locally** to preview

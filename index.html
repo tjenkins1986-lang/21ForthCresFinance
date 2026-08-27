@@ -2245,7 +2245,8 @@ document.getElementById('copyStateBtn').addEventListener('click', copyStateAsJso
 document.getElementById('jsonImportNote').innerHTML =
   `Paste a snapshot and click <b style="color:var(--text-mid)">Apply Locally</b> to preview it in your browser only, then ` +
   `<b style="color:var(--text-mid)">Save to Cloud</b> once you're happy, to persist it to Firestore for both of you. ` +
-  `<b style="color:var(--text-mid)">Copy Current Data as JSON</b> grabs what's currently loaded (e.g. to edit offline and re-paste). Only the keys you include get replaced — anything omitted is left as-is.`;
+  `<b style="color:var(--text-mid)">Copy Current Data as JSON</b> grabs what's currently loaded (e.g. to edit offline and re-paste). ` +
+  `<b style="color:var(--text-mid)">spend</b> and <b style="color:var(--text-mid)">contrib</b> merge in by month (include just the new month, past months are untouched); every other key fully replaces if included, and is left as-is if omitted. See DATA-FORMAT.md for the full schema.`;
 
 /* =========================================================================
    Hooks called by the Firebase module script at the bottom of this file,
