@@ -522,9 +522,9 @@
     align-items: baseline;
     gap: 12px;
     padding: 10px 0;
-    border-top: 1px dashed var(--line);
   }
-  .modal-row:first-child{ border-top: none; }
+  .modal-item{ border-top: 1px dashed var(--line); }
+  .modal-item:first-child{ border-top: none; }
   .modal-row .mdesc{ font-size: 12.5px; color: var(--text-mid); line-height: 1.4; }
   .modal-row .mdate{
     font-family:'IBM Plex Mono', monospace;
@@ -539,6 +539,53 @@
     color: var(--text-hi);
     white-space: nowrap;
   }
+  .mrow-toggle{
+    cursor: pointer;
+    border-radius: 3px;
+    margin: 0 -8px;
+    padding: 10px 8px;
+    transition: background 0.12s ease;
+  }
+  .mrow-toggle:hover{ background: var(--ink-3); }
+  .mrow-actions{ display: none; }
+  .modal-item.expanded .mrow-actions{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 0 0 14px;
+  }
+  .mrow-select{
+    background: var(--ink);
+    color: var(--text-hi);
+    border: 1px solid var(--line-strong);
+    border-radius: 3px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 12.5px;
+    padding: 7px 8px;
+    flex: 1;
+    min-width: 140px;
+  }
+  .mrow-move-btn, .mrow-delete-btn, .mrow-cancel-btn{
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 12px;
+    padding: 7px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .mrow-move-btn{ background: var(--brass); color: var(--ink); border: none; font-weight: 500; }
+  .mrow-move-btn:hover{ background: var(--brass-dim); }
+  .mrow-delete-btn{ background: transparent; color: var(--clay); border: 1px solid var(--clay); }
+  .mrow-delete-btn:hover{ background: rgba(166,70,45,0.12); }
+  .mrow-cancel-btn{ background: none; border: none; color: var(--text-low); text-decoration: underline; padding: 7px 4px; }
+  .modal-sync-status{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 0 22px 10px;
+    min-height: 1em;
+  }
+  .modal-sync-status.success{ color: var(--sage); }
+  .modal-sync-status.error{ color: var(--clay); }
   .modal-empty{
     padding: 24px 0;
     text-align:center;
@@ -1315,6 +1362,7 @@ Only the keys you include get replaced — anything omitted is left as-is.'></te
       <button class="modal-close" id="modalClose" type="button">✕</button>
     </div>
     <div class="modal-list" id="modalList"></div>
+    <div class="modal-sync-status" id="modalSyncStatus"></div>
     <div class="modal-total" id="modalTotal"></div>
   </div>
 </div>
@@ -1719,29 +1767,127 @@ function renderSpendTable(){
   });
 }
 
+let modalSpendCat = null, modalSpendMonth = null;
+
 function openSpendModal(cat, month){
   if(!month) return;
-  const items = (STATE.spend.transactions[cat] && STATE.spend.transactions[cat][month]) || [];
+  modalSpendCat = cat;
+  modalSpendMonth = month;
   document.getElementById('modalCat').textContent = cat;
   const isCurrent = month === CURRENT_MONTH;
   document.getElementById('modalMonth').textContent = monthLong(month) + (isCurrent ? ` — partial, to ${CURRENT_AS_OF_DAY}th` : '');
+  document.getElementById('modalSyncStatus').textContent = '';
+  document.getElementById('modalSyncStatus').className = 'modal-sync-status';
+  renderSpendModalList();
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function renderSpendModalList(){
+  const cat = modalSpendCat, month = modalSpendMonth;
+  const items = (STATE.spend.transactions[cat] && STATE.spend.transactions[cat][month]) || [];
+  const otherCats = (STATE.spend.categories || []).filter(c => c !== cat);
 
   const listEl = document.getElementById('modalList');
   listEl.innerHTML = items.length === 0
     ? `<div class="modal-empty">No transactions recorded in this category for ${monthShort(month)}.</div>`
-    : items.map(it => `
-      <div class="modal-row">
-        <div>
-          <div class="mdesc">${escapeHtml(it.desc)}</div>
-          <span class="mdate">${formatDate(it.date)}</span>
+    : items.map((it, i) => `
+      <div class="modal-item" data-idx="${i}">
+        <div class="modal-row mrow-toggle">
+          <div>
+            <div class="mdesc">${escapeHtml(it.desc)}</div>
+            <span class="mdate">${formatDate(it.date)}</span>
+          </div>
+          <div class="mamt">${gbp(it.amount)}</div>
         </div>
-        <div class="mamt">${gbp(it.amount)}</div>
+        <div class="mrow-actions">
+          <select class="mrow-select" aria-label="Move to category">
+            ${otherCats.map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join('')}
+          </select>
+          <button type="button" class="mrow-move-btn">Move</button>
+          <button type="button" class="mrow-delete-btn">Delete</button>
+          <button type="button" class="mrow-cancel-btn">Cancel</button>
+        </div>
       </div>
     `).join('');
 
   const total = items.reduce((a,b) => a + Number(b.amount||0), 0);
   document.getElementById('modalTotal').innerHTML = `<span>Total</span><b>${gbp(total)}</b>`;
-  document.getElementById('modalOverlay').classList.add('open');
+
+  listEl.querySelectorAll('.modal-item').forEach(itemEl => {
+    const idx = Number(itemEl.dataset.idx);
+    const item = items[idx];
+
+    itemEl.querySelector('.mrow-toggle').addEventListener('click', () => {
+      const wasExpanded = itemEl.classList.contains('expanded');
+      listEl.querySelectorAll('.modal-item.expanded').forEach(el => el.classList.remove('expanded'));
+      if(!wasExpanded) itemEl.classList.add('expanded');
+    });
+
+    itemEl.querySelector('.mrow-cancel-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      itemEl.classList.remove('expanded');
+    });
+
+    itemEl.querySelector('.mrow-move-btn').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const newCat = itemEl.querySelector('.mrow-select').value;
+      if(!newCat || newCat === cat) return;
+      moveSpendTransaction(cat, month, idx, newCat);
+      deriveAndRenderAll();
+      renderSpendModalList();
+      await persistSpendEdit();
+    });
+
+    itemEl.querySelector('.mrow-delete-btn').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if(!confirm(`Delete "${item.desc}" (${gbp(item.amount)})? This can't be undone.`)) return;
+      deleteSpendTransaction(cat, month, idx);
+      deriveAndRenderAll();
+      renderSpendModalList();
+      await persistSpendEdit();
+    });
+  });
+}
+
+function moveSpendTransaction(cat, month, idx, newCat){
+  const list = STATE.spend.transactions[cat] && STATE.spend.transactions[cat][month];
+  if(!list || !list[idx]) return;
+  const [item] = list.splice(idx, 1);
+  STATE.spend.monthly[cat] = STATE.spend.monthly[cat] || {};
+  STATE.spend.monthly[cat][month] = (STATE.spend.monthly[cat][month] || 0) - Number(item.amount || 0);
+
+  STATE.spend.transactions[newCat] = STATE.spend.transactions[newCat] || {};
+  STATE.spend.transactions[newCat][month] = STATE.spend.transactions[newCat][month] || [];
+  STATE.spend.transactions[newCat][month].push(item);
+  STATE.spend.monthly[newCat] = STATE.spend.monthly[newCat] || {};
+  STATE.spend.monthly[newCat][month] = (STATE.spend.monthly[newCat][month] || 0) + Number(item.amount || 0);
+}
+
+function deleteSpendTransaction(cat, month, idx){
+  const list = STATE.spend.transactions[cat] && STATE.spend.transactions[cat][month];
+  if(!list || !list[idx]) return;
+  const [item] = list.splice(idx, 1);
+  STATE.spend.monthly[cat] = STATE.spend.monthly[cat] || {};
+  STATE.spend.monthly[cat][month] = (STATE.spend.monthly[cat][month] || 0) - Number(item.amount || 0);
+}
+
+async function persistSpendEdit(){
+  const statusEl = document.getElementById('modalSyncStatus');
+  if(typeof window.__saveStateToCloud !== 'function'){
+    statusEl.textContent = 'Kept in this browser only — cloud storage isn\'t connected yet.';
+    statusEl.className = 'modal-sync-status';
+    return;
+  }
+  statusEl.textContent = 'Saving…';
+  statusEl.className = 'modal-sync-status';
+  try {
+    await window.__saveStateToCloud(STATE);
+    statusEl.textContent = 'Saved — visible to both of you now.';
+    statusEl.className = 'modal-sync-status success';
+  } catch(e){
+    statusEl.textContent = 'Save failed: ' + e.message;
+    statusEl.className = 'modal-sync-status error';
+  }
 }
 
 document.getElementById('modalClose').addEventListener('click', closeSpendModal);
@@ -1943,21 +2089,27 @@ function renderContribTable(){
 }
 
 function openContribModal(row, month){
+  modalSpendCat = null;
+  modalSpendMonth = null;
   const items = (STATE.contrib.rows[row] && STATE.contrib.rows[row].transactions[month]) || [];
   document.getElementById('modalCat').textContent = row;
   const isCurrent = month === CONTRIB_CURRENT_MONTH;
   document.getElementById('modalMonth').textContent = monthLong(month) + (isCurrent ? ` — most recent month in this view` : '');
+  document.getElementById('modalSyncStatus').textContent = '';
+  document.getElementById('modalSyncStatus').className = 'modal-sync-status';
 
   const listEl = document.getElementById('modalList');
   listEl.innerHTML = items.length === 0
     ? `<div class="modal-empty">Nothing recorded under "${row}" for ${monthShort(month)}.</div>`
     : items.map(it => `
-      <div class="modal-row">
-        <div>
-          <div class="mdesc">${escapeHtml(it.desc)}</div>
-          <span class="mdate">${formatDate(it.date)}</span>
+      <div class="modal-item">
+        <div class="modal-row">
+          <div>
+            <div class="mdesc">${escapeHtml(it.desc)}</div>
+            <span class="mdate">${formatDate(it.date)}</span>
+          </div>
+          <div class="mamt">${gbp(it.amount)}</div>
         </div>
-        <div class="mamt">${gbp(it.amount)}</div>
       </div>
     `).join('');
 
