@@ -1685,14 +1685,16 @@ function rollingAvg(cat){
 function renderSpendTable(){
   document.getElementById('spendAsOf').textContent = CURRENT_MONTH ? ('Snapshot as of ' + CURRENT_AS_OF_DAY + ' ' + monthLong(CURRENT_MONTH)) : '';
   document.getElementById('spendNote').innerHTML = SPEND_MONTHS.length
-    ? (`6-month rolling average is calculated over <b style="color:var(--text-mid)">${monthShort(TRAILING_MONTHS[0])}–${monthShort(TRAILING_MONTHS[TRAILING_MONTHS.length-1])}</b>. ` +
-       `<b style="color:var(--text-mid)">${monthLong(CURRENT_MONTH)}</b> is the live month, partial to the ${CURRENT_AS_OF_DAY}${CURRENT_AS_OF_DAY===24?'th':'th'} — compared against that average, not a full month.`)
+    ? (`6-month rolling average is calculated over <b style="color:var(--text-mid)">${monthShort(TRAILING_MONTHS[0])}–${monthShort(TRAILING_MONTHS[TRAILING_MONTHS.length-1])}</b>, including the live month. ` +
+       `<b style="color:var(--text-mid)">${monthLong(CURRENT_MONTH)}</b> is partial, to the ${CURRENT_AS_OF_DAY}th — it's already counted in the average shown, which will keep shifting as the month fills in.`)
     : 'No spend data yet — sign in and load a monthly snapshot via Widget 09 below.';
 
   let headHtml = '<tr><th class="col-cat">Category</th>';
-  TRAILING_MONTHS.forEach(m => { headHtml += `<th>${monthShort(m)}</th>`; });
+  TRAILING_MONTHS.forEach(m => {
+    const isCurrent = m === CURRENT_MONTH;
+    headHtml += `<th class="${isCurrent ? 'col-current' : ''}">${monthShort(m)}${isCurrent ? ' (to '+CURRENT_AS_OF_DAY+'th)' : ''}</th>`;
+  });
   headHtml += `<th class="col-avg">6-Mo Avg</th>`;
-  headHtml += `<th class="col-current">${monthShort(CURRENT_MONTH)}${CURRENT_MONTH ? ' (to '+CURRENT_AS_OF_DAY+'th)' : ''}</th>`;
   headHtml += `<th>Δ vs Avg</th></tr>`;
   document.getElementById('spendThead').innerHTML = headHtml;
 
@@ -1718,9 +1720,8 @@ function renderSpendTable(){
     const groupDeltaPct = groupAvg !== 0 ? (groupDelta/groupAvg*100) : null;
 
     bodyHtml += `<tr class="group-row"><td class="col-cat">${group.label}<span class="group-note">${group.note}</span></td>`;
-    TRAILING_MONTHS.forEach(m => { bodyHtml += `<td>${gbp(groupColumnTotals[m])}</td>`; });
+    TRAILING_MONTHS.forEach(m => { bodyHtml += `<td class="${m === CURRENT_MONTH ? 'col-current' : ''}">${gbp(groupColumnTotals[m])}</td>`; });
     bodyHtml += `<td class="col-avg">${gbp(groupAvg)}</td>`;
-    bodyHtml += `<td class="col-current">${gbp(groupCurrent)}</td>`;
     bodyHtml += `<td class="col-delta ${groupDeltaClass}">${groupDelta===0?'–':groupArrow+' '+gbp(Math.abs(groupDelta))}${groupDeltaPct!==null && groupDelta!==0 ? ' ('+(groupDelta>0?'+':'−')+Math.abs(groupDeltaPct).toFixed(0)+'%)' : ''}</td>`;
     bodyHtml += `</tr>`;
 
@@ -1739,10 +1740,10 @@ function renderSpendTable(){
       TRAILING_MONTHS.forEach(m => {
         const v = catMonthly(cat, m);
         columnTotals[m] += v;
-        bodyHtml += `<td class="cell-click" data-cat="${escapeAttr(cat)}" data-month="${m}">${gbp(v)}</td>`;
+        const isCurrent = m === CURRENT_MONTH;
+        bodyHtml += `<td class="cell-click${isCurrent ? ' col-current' : ''}" data-cat="${escapeAttr(cat)}" data-month="${m}">${gbp(v)}</td>`;
       });
       bodyHtml += `<td class="col-avg">${gbp(avg)}</td>`;
-      bodyHtml += `<td class="col-current cell-click" data-cat="${escapeAttr(cat)}" data-month="${CURRENT_MONTH||''}">${gbp(current)}</td>`;
       bodyHtml += `<td class="col-delta ${deltaClass}">${delta===0?'–':arrow+' '+gbp(Math.abs(delta))}${deltaPct!==null && delta!==0 ? ' ('+(delta>0?'+':'−')+Math.abs(deltaPct).toFixed(0)+'%)' : ''}</td>`;
       bodyHtml += `</tr>`;
     });
@@ -1755,9 +1756,8 @@ function renderSpendTable(){
   const totalDeltaPct = avgTotal !== 0 ? (totalDelta/avgTotal*100) : null;
 
   let footHtml = '<tr><td class="col-cat">Total Spend</td>';
-  TRAILING_MONTHS.forEach(m => { footHtml += `<td>${gbp(columnTotals[m])}</td>`; });
+  TRAILING_MONTHS.forEach(m => { footHtml += `<td class="${m === CURRENT_MONTH ? 'col-current' : ''}">${gbp(columnTotals[m])}</td>`; });
   footHtml += `<td class="col-avg">${gbp(avgTotal)}</td>`;
-  footHtml += `<td class="col-current">${gbp(currentTotal)}</td>`;
   footHtml += `<td class="col-delta ${totalDeltaClass}">${totalDelta===0?'–':totalArrow+' '+gbp(Math.abs(totalDelta))}${totalDeltaPct!==null && totalDelta!==0 ? ' ('+(totalDelta>0?'+':'−')+Math.abs(totalDeltaPct).toFixed(0)+'%)' : ''}</td>`;
   footHtml += `</tr>`;
   document.getElementById('spendTfoot').innerHTML = footHtml;
@@ -2257,7 +2257,10 @@ async function persistActionsChange(){
 function deriveAndRenderAll(){
   SPEND_MONTHS = STATE.spend.months || [];
   CURRENT_MONTH = SPEND_MONTHS.length ? SPEND_MONTHS[SPEND_MONTHS.length-1] : null;
-  TRAILING_MONTHS = SPEND_MONTHS.length ? SPEND_MONTHS.slice(Math.max(0, SPEND_MONTHS.length-7), SPEND_MONTHS.length-1) : [];
+  // The 6 most recent months, INCLUDING the current/live one — the rolling
+  // average always reflects the latest data as soon as it's entered, rather
+  // than waiting a full cycle for a month to "graduate" into it.
+  TRAILING_MONTHS = SPEND_MONTHS.length ? SPEND_MONTHS.slice(Math.max(0, SPEND_MONTHS.length-6)) : [];
   CURRENT_AS_OF_DAY = STATE.meta.currentAsOfDay || 1;
 
   CONTRIB_EXCLUDE_MONTHS = STATE.contrib.excludeMonths || [];
